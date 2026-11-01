@@ -106,7 +106,14 @@
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
 @if($errors->any())
-    <div class="alert alert-error">One or more fields have errors. Please correct them before re-submitting.</div>
+    <div class="alert alert-error">
+        <strong>Please correct the following errors:</strong>
+        <ul style="padding-left:1.2rem;margin-top:4px;">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
 @endif
 
 <div class="reg-layout">

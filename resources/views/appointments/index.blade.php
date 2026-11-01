@@ -144,57 +144,66 @@
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
 
+@if($errors->any())
+    <div class="alert alert-error">
+        <strong>Unable to complete booking. Please correct the following:</strong>
+        <ul style="padding-left:1.2rem;margin-top:4px;">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
 <div class="appt-layout">
 
     {{-- Booking Form --}}
     <div class="book-card">
         <div class="book-head">New Appointment Request</div>
         <div class="book-body">
-            <form method="POST" action="{{ url('/appointments') }}" novalidate>
+            <form method="POST" action="{{ url('/appointments') }}">
                 @csrf
 
                 <div class="field-group">
                     <label class="form-label">University / Patient ID <span class="req">*</span></label>
-                    <input type="text" name="university_id" class="form-control" placeholder="e.g. 2021-CSE-042" value="{{ old('university_id') }}" required>
+                    <input type="text" name="university_id" class="form-control" placeholder="e.g. 2021-CSE-042" value="{{ old('university_id', Auth::check() ? Auth::user()->university_id : '') }}" required>
                 </div>
 
                 <div class="field-group">
                     <label class="form-label">Full Name <span class="req">*</span></label>
-                    <input type="text" name="patient_name" class="form-control" value="{{ old('patient_name') }}" required>
+                    <input type="text" name="patient_name" class="form-control" value="{{ old('patient_name', Auth::check() ? Auth::user()->name : '') }}" required>
                 </div>
 
                 <div class="field-group">
                     <label class="form-label">Department / Clinic <span class="req">*</span></label>
                     <select name="department" class="form-control" required>
-                        <option value="">— Select a clinic —</option>
-                        @foreach([
-                            'General Medicine' => 'General Medicine (Walk-in + Appt)',
-                            'Dental'           => 'Dental Clinic (Appt only)',
-                            'Counselling'      => 'Counselling & Mental Health (Appt only)',
-                            'Gynaecology'      => 'Gynaecology (Appt only)',
-                            'Laboratory'       => 'Laboratory / Diagnostics',
-                            'Internal Medicine'=> 'Internal Medicine',
-                            'Eye / ENT'        => 'Eye & ENT (Visiting consultant)',
-                        ] as $val => $label)
-                            <option value="{{ $val }}" {{ old('department') === $val ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
+                        <option value="General Medicine" {{ old('department') === 'General Medicine' ? 'selected' : '' }}>General Medicine (Walk-in + Appt)</option>
+                        <option value="Dental" {{ old('department') === 'Dental' ? 'selected' : '' }}>Dental Clinic</option>
+                        <option value="Counselling" {{ old('department') === 'Counselling' ? 'selected' : '' }}>Counselling &amp; Mental Health</option>
+                        <option value="Gynaecology" {{ old('department') === 'Gynaecology' ? 'selected' : '' }}>Gynaecology</option>
+                        <option value="Laboratory" {{ old('department') === 'Laboratory' ? 'selected' : '' }}>Laboratory &amp; Diagnostics</option>
                     </select>
                 </div>
 
                 <div class="field-group">
                     <label class="form-label">Preferred Doctor</label>
                     <select name="doctor" class="form-control">
-                        <option value="">— Any available —</option>
-                        <option value="dr_rahman"  {{ old('doctor') === 'dr_rahman'  ? 'selected' : '' }}>Dr. Anisur Rahman (General Medicine)</option>
-                        <option value="dr_sultana" {{ old('doctor') === 'dr_sultana' ? 'selected' : '' }}>Dr. Nusrat Sultana (Gynaecology)</option>
-                        <option value="dr_karim"   {{ old('doctor') === 'dr_karim'   ? 'selected' : '' }}>Dr. Abdur Karim (Dental)</option>
-                        <option value="dr_hossain" {{ old('doctor') === 'dr_hossain' ? 'selected' : '' }}>Dr. Farid Hossain (Internal Medicine)</option>
+                        <option value="">— Any available Medical Officer —</option>
+                        @if(isset($doctors) && count($doctors) > 0)
+                            @foreach($doctors as $d)
+                                <option value="{{ $d->id }}" {{ old('doctor') == $d->id ? 'selected' : '' }}>{{ $d->name }} ({{ $d->department }})</option>
+                            @endforeach
+                        @else
+                            <option value="General Medicine">Dr. Anisur Rahman (General Medicine)</option>
+                            <option value="Gynaecology">Dr. Nusrat Sultana (Gynaecology)</option>
+                            <option value="Dental">Dr. Abdur Karim (Dental)</option>
+                        @endif
                     </select>
                 </div>
 
                 <div class="field-group">
                     <label class="form-label">Appointment Date <span class="req">*</span></label>
-                    <input type="date" name="date" class="form-control" min="{{ date('Y-m-d') }}" value="{{ old('date') }}" required>
+                    <input type="date" name="date" class="form-control" min="{{ date('Y-m-d') }}" value="{{ old('date', date('Y-m-d')) }}" required>
                 </div>
 
                 <div class="field-group">
@@ -202,18 +211,19 @@
                     @php
                         $slots = ['8:00','8:30','9:00','9:30','10:00','10:30','11:00','11:30','12:00','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
                         $taken = ['9:00','10:00','14:00','16:00'];
+                        $currentSlot = old('time', '09:30');
                     @endphp
                     <div class="slot-grid">
                         @foreach($slots as $slot)
                             <button type="button"
-                                class="slot {{ in_array($slot, $taken) ? 'taken' : '' }} {{ old('time') === $slot ? 'sel' : '' }}"
+                                class="slot {{ in_array($slot, $taken) ? 'taken' : '' }} {{ $currentSlot === $slot ? 'sel' : '' }}"
                                 onclick="{{ in_array($slot, $taken) ? 'void(0)' : "pickSlot(this,'{$slot}')" }}">
                                 {{ $slot }}
                             </button>
                         @endforeach
                     </div>
-                    <input type="hidden" name="time" id="timeInput" value="{{ old('time') }}">
-                    <p style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:400;">Times are 24h. Slots shown for selected date.</p>
+                    <input type="hidden" name="time" id="timeInput" value="{{ $currentSlot }}" required>
+                    <p style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:400;">Times are 24h. Selected time slot: <strong id="selectedSlotText">{{ $currentSlot }}</strong></p>
                 </div>
 
                 <div class="field-group">
@@ -255,38 +265,57 @@
                 </thead>
                 <tbody>
                     @php
-                        $list = [
-                            ['id'=>'A-00491','name'=>'Rahman Al-Hasan',  'uid'=>'2022-EEE-011','dept'=>'General Medicine',   'doctor'=>'Dr. Anisur Rahman', 'date'=>'5 Oct 2026','time'=>'8:00', 'status'=>'Confirmed'],
-                            ['id'=>'A-00492','name'=>'Nadia Akter',       'uid'=>'2023-BBA-044','dept'=>'Counselling',        'doctor'=>'Ms. Reshma Akter',  'date'=>'5 Oct 2026','time'=>'11:00','status'=>'Pending'],
-                            ['id'=>'A-00493','name'=>'Tariq Hossain',     'uid'=>'2021-CSE-078','dept'=>'Dental',             'doctor'=>'Dr. Abdur Karim',   'date'=>'6 Oct 2026','time'=>'15:30','status'=>'Confirmed'],
-                            ['id'=>'A-00494','name'=>'Sumaiya Begum',     'uid'=>'FAC-ENG-009', 'dept'=>'Gynaecology',        'doctor'=>'Dr. Nusrat Sultana','date'=>'7 Oct 2026','time'=>'10:30','status'=>'Confirmed'],
-                            ['id'=>'A-00495','name'=>'Imran Kabir',        'uid'=>'2024-PHY-021','dept'=>'Internal Medicine',  'doctor'=>'Dr. Farid Hossain', 'date'=>'8 Oct 2026','time'=>'9:30', 'status'=>'Cancelled'],
-                            ['id'=>'A-00496','name'=>'Tasnim Jahan',      'uid'=>'2022-MED-033','dept'=>'Laboratory',         'doctor'=>'Dr. Anisur Rahman', 'date'=>'9 Oct 2026','time'=>'8:30', 'status'=>'Pending'],
-                        ];
-                        $badge = ['Confirmed'=>'badge-green','Pending'=>'badge-yellow','Cancelled'=>'badge-red'];
+                        $badge = ['Confirmed'=>'badge-green','Pending'=>'badge-yellow','Cancelled'=>'badge-red','confirmed'=>'badge-green','pending'=>'badge-yellow','cancelled'=>'badge-red','completed'=>'badge-blue'];
                     @endphp
-                    @foreach($list as $i => $a)
-                    <tr>
-                        <td style="font-size:11px;color:var(--muted);">{{ $a['id'] }}</td>
-                        <td>
-                            <span class="patient-name">{{ $a['name'] }}</span>
-                            <span class="patient-id">{{ $a['uid'] }}</span>
-                        </td>
-                        <td>
-                            <span style="font-weight:700;font-size:12px;">{{ $a['dept'] }}</span><br>
-                            <span style="font-size:11px;color:var(--muted);">{{ $a['doctor'] }}</span>
-                        </td>
-                        <td style="font-size:12px;">{{ $a['date'] }}</td>
-                        <td style="font-size:12px;font-weight:700;">{{ $a['time'] }}</td>
-                        <td><span class="badge {{ $badge[$a['status']] }}">{{ $a['status'] }}</span></td>
-                    </tr>
-                    @endforeach
+                    @if(isset($recentAppointments) && $recentAppointments->count() > 0)
+                        @foreach($recentAppointments as $a)
+                            <tr>
+                                <td style="font-size:11px;color:var(--muted);">{{ $a->appointment_number }}</td>
+                                <td>
+                                    <span class="patient-name">{{ $a->patient ? $a->patient->full_name : 'Patient' }}</span>
+                                    <span class="patient-id">{{ $a->patient ? $a->patient->university_id : 'N/A' }}</span>
+                                </td>
+                                <td>
+                                    <span style="font-weight:700;font-size:12px;">{{ $a->department }}</span><br>
+                                    <span style="font-size:11px;color:var(--muted);">{{ $a->doctor ? $a->doctor->name : 'Attending Officer' }}</span>
+                                </td>
+                                <td style="font-size:12px;">{{ $a->appointment_date->format('d M Y') }}</td>
+                                <td style="font-size:12px;font-weight:700;">{{ $a->time_slot }}</td>
+                                <td><span class="badge {{ $badge[$a->status] ?? 'badge-green' }}">{{ ucfirst($a->status) }}</span></td>
+                            </tr>
+                        @endforeach
+                    @else
+                        @php
+                            $list = [
+                                ['id'=>'APT-2026-0041','name'=>'Rahman Al-Hasan',  'uid'=>'2022-CSE-011','dept'=>'General Medicine',   'doctor'=>'Dr. Anisur Rahman', 'date'=>'Today','time'=>'09:00', 'status'=>'Confirmed'],
+                                ['id'=>'APT-2026-0042','name'=>'Nadia Akter',       'uid'=>'2023-BBA-044','dept'=>'General Medicine',   'doctor'=>'Dr. Anisur Rahman',  'date'=>'Today','time'=>'09:30','status'=>'Confirmed'],
+                                ['id'=>'APT-2026-0043','name'=>'Tariq Hossain',     'uid'=>'2021-CSE-078','dept'=>'Dental',             'doctor'=>'Dr. Abdur Karim',   'date'=>'Today','time'=>'10:00','status'=>'Confirmed'],
+                                ['id'=>'APT-2026-0044','name'=>'Sumaiya Begum',     'uid'=>'FAC-ENG-009', 'dept'=>'Gynaecology',        'doctor'=>'Dr. Nusrat Sultana','date'=>'Tomorrow','time'=>'11:00','status'=>'Confirmed'],
+                            ];
+                        @endphp
+                        @foreach($list as $i => $a)
+                        <tr>
+                            <td style="font-size:11px;color:var(--muted);">{{ $a['id'] }}</td>
+                            <td>
+                                <span class="patient-name">{{ $a['name'] }}</span>
+                                <span class="patient-id">{{ $a['uid'] }}</span>
+                            </td>
+                            <td>
+                                <span style="font-weight:700;font-size:12px;">{{ $a['dept'] }}</span><br>
+                                <span style="font-size:11px;color:var(--muted);">{{ $a['doctor'] }}</span>
+                            </td>
+                            <td style="font-size:12px;">{{ $a['date'] }}</td>
+                            <td style="font-size:12px;font-weight:700;">{{ $a['time'] }}</td>
+                            <td><span class="badge {{ $badge[$a['status']] }}">{{ $a['status'] }}</span></td>
+                        </tr>
+                        @endforeach
+                    @endif
                 </tbody>
             </table>
         </div>
 
         <p style="font-size:11px;color:var(--muted);margin-top:.6rem;font-weight:400;">
-            Showing {{ count($list) }} appointments. To cancel or reschedule, please contact the Medical Centre counter or call 0188888888.
+            Showing {{ (isset($recentAppointments) && $recentAppointments->count() > 0) ? $recentAppointments->count() : (isset($list) ? count($list) : 0) }} appointments. To cancel or reschedule, please contact the Medical Centre counter or call 0188888888.
         </p>
     </div>
 </div>
@@ -299,6 +328,8 @@
         document.querySelectorAll('.slot:not(.taken)').forEach(s => s.classList.remove('sel'));
         el.classList.add('sel');
         document.getElementById('timeInput').value = val;
+        var txt = document.getElementById('selectedSlotText');
+        if (txt) txt.textContent = val;
     }
 </script>
 @endpush
